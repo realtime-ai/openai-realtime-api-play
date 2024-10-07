@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>
+<title> Realtime API Demo  </title>
+    <style type="text/css">
+        .room {
+            cursor: pointer;
+        }
+        div.select {
+        display: inline-block;
+        margin: 0 0 1em 0;
+        }
+    </style>
+
+    <script type='module'>
+    
+        console.log(import.meta.env)
+    
+        import { RealtimeClient } from '@openai/realtime-api-beta';
+
+        import {  WavStreamPlayer, WavRecorder } from './src/lib/wavtools';
+
+        console.log(WavStreamPlayer);
+        console.log(WavRecorder);
+
+        const recorder = new WavRecorder({ sampleRate: 24000 });
+        const player = new WavStreamPlayer({ sampleRate: 24000 });
+
+
+        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+        const relayURL = import.meta.env.VITE_OPENAI_RELAY_URL;
+        const client = new RealtimeClient({ 
+            apiKey: apiKey,
+            dangerouslyAllowAPIKeyInBrowser: true,
+            url: relayURL ? relayURL : undefined,
+        });
+
+        // Can set parameters ahead of connecting, either separately or all at once
+        client.updateSession({ instructions: 'You are a great, upbeat friend.' });
+        client.updateSession({ voice: 'alloy' });
+        client.updateSession({
+            turn_detection: { type: 'server_vad' }, // or 'server_vad'
+        });
+
+
+        client.on('session.update', (event) => {
+            console.log('session.update', event);
+        });
+
+        // Set up event handling
+        client.on('conversation.updated', (event) => {
+            console.log('conversation.updated', event);
+            const { item, delta } = event;
+
+            if (delta?.audio) {
+                player.add16BitPCM(delta.audio, item.id);
+            }
+        });
+
+        client.on('realtime.event', (event) => {
+            console.log('realtime.event', event);
+
+        });
+
+        client.on('error', (error) => {
+            console.error('error', error);
+        });
+
+        client.on('conversation.interrupted', async (event) => {
+            const trackSampleOffset = await player.interrupt();
+            if (trackSampleOffset?.trackId) {
+                const { trackId, offset } = trackSampleOffset;
+                await client.cancelResponse(trackId, offset);
+            }
+        });
+
+
+        async function start() {
+
+            await recorder.begin();
+
+            await player.connect();
+            
+            // Connect to Realtime API
+            await client.connect();
+            // Send a item and triggers a generation
+            client.sendUserMessageContent([{ type: 'input_text', text: `Hello!` }]);
+
+            await recorder.record((data) => {
+                console.log('recording =======');
+                client.appendInputAudio(data.mono);
+            });
+        }
+
+
+        async function stop(params) {
+
+            await recorder.end();
+
+            await player.interrupt();
+
+            // Disconnect from Realtime API
+            await client.disconnect();
+        }
+
+        window.start = start;
+        window.stop = stop;
+    </script>
+</head>
+<body >
+	<h1>Realtime API Demo</h1>
+
+    <button onclick="start()">Start</button>
+    <button onclick="stop()">Stop</button>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "openai-realtime-api-play",
+  "version": "1.0.0",
+  "description": "openai realtime api play",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@openai/realtime-api-beta": "github:openai/openai-realtime-api-beta",
+    "dotenv": "^16.4.5"
+  }
+}
